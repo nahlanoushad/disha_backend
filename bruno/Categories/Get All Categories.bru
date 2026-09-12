@@ -1,0 +1,15 @@
+meta {
+  name: Get All Categories
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/categories
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Filter Active Categories
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/categories?status=active
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

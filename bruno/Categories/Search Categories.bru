@@ -1,0 +1,15 @@
+meta {
+  name: Search Categories
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/categories?search=engineering
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

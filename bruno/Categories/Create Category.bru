@@ -1,0 +1,30 @@
+meta {
+  name: Create Category
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Astronomy",
+    "description": "Study of celestial objects"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

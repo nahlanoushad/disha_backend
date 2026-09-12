@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 
 const app = express();
 
@@ -23,6 +24,9 @@ app.get('/api/health', (req, res) => {
 // Authentication routes
 app.use('/api/auth', authRoutes);
 
+// Category routes
+app.use('/api/categories', categoryRoutes);
+
 // 404 handler for undefined routes
 app.use((req, res) => {
   res.status(404).json({
@@ -34,8 +38,11 @@ app.use((req, res) => {
 // Central error handler
 app.use((err, req, res, next) => {
   console.error('API Error:', err);
-  res.status(err.statusCode || 500).json({
-    status: 'error',
+  const statusCode = err.statusCode || 500;
+  const status = err.status || (statusCode < 500 ? 'fail' : 'error');
+  
+  res.status(statusCode).json({
+    status: status,
     message: err.message || 'Internal Server Error'
   });
 });

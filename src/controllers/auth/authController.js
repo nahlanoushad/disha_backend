@@ -88,12 +88,9 @@ export const getMe = async (req, res) => {
     status: 'success',
     data: {
       admin: {
-        id: req.admin._id,
         name: req.admin.name,
         email: req.admin.email,
-        role: req.admin.role,
-        lastLogin: req.admin.lastLogin,
-        createdAt: req.admin.createdAt
+        role: req.admin.role
       }
     }
   });

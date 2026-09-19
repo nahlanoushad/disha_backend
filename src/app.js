@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
+import userAuthRoutes from './routes/userAuthRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 const app = express();
 
@@ -21,7 +23,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authentication routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // Admin auth routes
+app.use('/api/auth/user', userAuthRoutes); // User auth routes
+app.use('/api/users', userRoutes); // User profile routes
 
 // 404 handler for undefined routes
 app.use((req, res) => {

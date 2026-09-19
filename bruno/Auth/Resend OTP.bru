@@ -1,0 +1,17 @@
+meta {
+  name: Resend OTP
+  type: http
+  seq: 6
+}
+
+post {
+  url: http://localhost:5000/api/auth/user/resend-otp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "testuser@example.com"
+  }
+}

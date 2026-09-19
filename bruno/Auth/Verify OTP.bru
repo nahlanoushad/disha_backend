@@ -1,0 +1,19 @@
+meta {
+  name: Verify OTP
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:5000/api/auth/user/verify-otp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "testuser@example.com",
+    "otp": "123456",
+    "fcmToken": "sample-fcm-token-12345"
+  }
+}

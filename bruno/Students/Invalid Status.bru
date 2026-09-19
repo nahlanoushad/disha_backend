@@ -1,0 +1,21 @@
+meta {
+  name: Invalid Status
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/admin/students/650000000000000000000000/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "status": "banned"
+  }
+}

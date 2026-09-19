@@ -1,0 +1,29 @@
+meta {
+  name: Create Course
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/courses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "name": "New Course",
+    "category": "REPLACE_WITH_ACTUAL_CATEGORY_ID",
+    "description": "A test course",
+    "status": "active"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+  adminToken: REPLACE_WITH_VALID_ADMIN_TOKEN
+}

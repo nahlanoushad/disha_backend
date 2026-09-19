@@ -1,0 +1,21 @@
+meta {
+  name: Update Entrance Exam
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/entrance-exams/650000000000000000000000
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "status": "inactive"
+  }
+}

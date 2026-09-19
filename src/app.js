@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
+import entranceExamRoutes from './routes/entranceExamRoutes.js';
+import studentAdminRoutes from './routes/studentRoutes.js';
+import studentAuthRoutes from './routes/studentAuthRoutes.js';
+import studentNotificationRoutes from './routes/studentNotificationRoutes.js';
 
 const app = express();
 
@@ -26,6 +31,17 @@ app.use('/api/auth', authRoutes);
 
 // Category routes
 app.use('/api/categories', categoryRoutes);
+
+// Course routes
+app.use('/api/courses', courseRoutes);
+
+// Entrance exam routes
+app.use('/api/entrance-exams', entranceExamRoutes);
+
+// Student routes
+app.use('/api/admin/students', studentAdminRoutes);
+app.use('/api/student/notifications', studentNotificationRoutes);
+app.use('/api/student', studentAuthRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

@@ -1,0 +1,28 @@
+meta {
+  name: Update Course
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/courses/{{courseId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "name": "Updated Course Name",
+    "status": "inactive"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+  adminToken: REPLACE_WITH_VALID_ADMIN_TOKEN
+  courseId: REPLACE_WITH_ACTUAL_COURSE_ID
+}

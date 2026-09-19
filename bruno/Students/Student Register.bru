@@ -1,0 +1,20 @@
+meta {
+  name: Student Register
+  type: http
+  seq: 20
+}
+
+post {
+  url: http://localhost:5000/api/student/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Nahla Test",
+    "email": "nahla@example.com",
+    "password": "Password123!",
+    "phone": "9876543210"
+  }
+}

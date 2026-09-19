@@ -1,0 +1,11 @@
+meta {
+  name: Filter Active Entrance Exams
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/entrance-exams?status=active
+  body: none
+  auth: none
+}

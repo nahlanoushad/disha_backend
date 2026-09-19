@@ -1,0 +1,15 @@
+meta {
+  name: Filter Inactive Students
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/admin/students?status=inactive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}

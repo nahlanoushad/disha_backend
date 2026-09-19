@@ -1,0 +1,22 @@
+meta {
+  name: Create Course - Unauthorized
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/courses
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Unauthorized Course",
+    "category": "65b93d395a123f1b4c123456"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

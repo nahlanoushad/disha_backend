@@ -1,0 +1,15 @@
+meta {
+  name: Get All Students
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/students
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}

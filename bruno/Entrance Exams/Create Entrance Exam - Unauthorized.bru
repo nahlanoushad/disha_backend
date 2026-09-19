@@ -1,0 +1,17 @@
+meta {
+  name: Create Entrance Exam - Unauthorized
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/entrance-exams
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Should Fail"
+  }
+}

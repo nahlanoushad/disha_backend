@@ -1,0 +1,22 @@
+meta {
+  name: Student Login
+  type: http
+  seq: 21
+}
+
+post {
+  url: http://localhost:5000/api/student/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "nahlanoushad06@gmail.com",
+    "password": "Password@10"
+  }
+}
+
+vars:post-response {
+  student_token: res.body.token
+}

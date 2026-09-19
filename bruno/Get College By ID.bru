@@ -1,0 +1,16 @@
+meta {
+  name: Get College By ID
+  type: http
+  seq: 5
+}
+
+get {
+  url: http://localhost:5000/api/colleges/6aae36c8d7c5f5edcaf5de21
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  forwardAuthorizationHeader: false
+}

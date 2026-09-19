@@ -1,0 +1,16 @@
+meta {
+  name: Delete College
+  type: http
+  seq: 6
+}
+
+delete {
+  url: http://localhost:5000/api/colleges/6aae36c8d7c5f5edcaf5de21
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  forwardAuthorizationHeader: false
+}

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
+import collegeRoutes from './routes/collegeRoutes.js';
 
 const app = express();
 
@@ -22,6 +23,9 @@ app.get('/api/health', (req, res) => {
 
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// College routes
+app.use('/api/colleges', collegeRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

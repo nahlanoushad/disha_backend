@@ -1,0 +1,37 @@
+meta {
+  name: Update College
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/colleges/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: COLLEGE_ID_HERE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "College of Engineering Trivandrum (CET) - Updated",
+    "location": {
+      "address": "Thiruvananthapuram, Kerala",
+      "latitude": 8.5456,
+      "longitude": 76.9063
+    },
+    "type": "Government",
+    "naacGrade": "A++",
+    "ranking": "#1 State"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

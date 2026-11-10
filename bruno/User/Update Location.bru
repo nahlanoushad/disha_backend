@@ -1,0 +1,22 @@
+meta {
+  name: Update Location
+  type: http
+  seq: 1
+}
+
+put {
+  url: http://localhost:5000/api/users/location
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "latitude": 37.7749,
+    "longitude": -122.4194
+  }
+}

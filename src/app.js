@@ -47,6 +47,9 @@ app.use('/api/admin/students', studentAdminRoutes);
 app.use('/api/student/notifications', studentNotificationRoutes);
 app.use('/api/student', studentAuthRoutes);
 
+// College routes
+app.use('/api/colleges', collegeRoutes);
+
 // 404 handler for undefined routes
 app.use((req, res) => {
   res.status(404).json({

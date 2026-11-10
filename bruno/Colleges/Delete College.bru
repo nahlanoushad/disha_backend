@@ -1,0 +1,19 @@
+meta {
+  name: Delete College
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/colleges/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: COLLEGE_ID_HERE
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

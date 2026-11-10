@@ -1,0 +1,33 @@
+meta {
+  name: Create College
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/colleges
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "College of Engineering Trivandrum (CET)",
+    "location": {
+      "address": "Thiruvananthapuram, Kerala",
+      "latitude": 8.5456,
+      "longitude": 76.9063
+    },
+    "type": "Government",
+    "naacGrade": "A++",
+    "ranking": "#1 State"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

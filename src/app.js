@@ -9,7 +9,9 @@ import entranceExamRoutes from './routes/entranceExamRoutes.js';
 import studentAdminRoutes from './routes/studentRoutes.js';
 import studentAuthRoutes from './routes/studentAuthRoutes.js';
 import studentNotificationRoutes from './routes/studentNotificationRoutes.js';
-
+import studentExamRoutes from './routes/studentExamRoutes.js';
+import studentAptitudeRoutes from './routes/studentAptitudeRoutes.js';
+import collegeRoutes from './routes/collegeRoutes.js';
 const app = express();
 
 // Enable CORS
@@ -45,7 +47,9 @@ app.use('/api/entrance-exams', entranceExamRoutes);
 // Student routes
 app.use('/api/admin/students', studentAdminRoutes);
 app.use('/api/student/notifications', studentNotificationRoutes);
+app.use('/api/student/aptitude', studentAptitudeRoutes);
 app.use('/api/student', studentAuthRoutes);
+app.use('/api/student', studentExamRoutes);
 
 // College routes
 app.use('/api/colleges', collegeRoutes);

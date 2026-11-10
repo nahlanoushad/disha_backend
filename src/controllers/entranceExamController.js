@@ -11,6 +11,7 @@ export const getEntranceExams = async (req, res, next) => {
     res.status(200).json({
       status: 'success',
       pagination: result.pagination,
+      summaryCounts: result.summaryCounts,
       data: {
         entranceExams: result.entranceExams
       }

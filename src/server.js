@@ -13,9 +13,8 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   await seedAdmin();
-  await seedCategories();
-  const server = app.listen(PORT, () => {
-    console.log(`DISHA backend server running on port ${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`DISHA backend server running on http://127.0.0.1:${PORT}`);
   });
   return server;
 };

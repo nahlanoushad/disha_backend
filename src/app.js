@@ -27,7 +27,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authentication routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // Admin auth routes
+app.use('/api/auth/user', userAuthRoutes); // User auth routes
+app.use('/api/users', userRoutes); // User profile routes
 
 // Category routes
 app.use('/api/categories', categoryRoutes);
@@ -56,7 +58,7 @@ app.use((err, req, res, next) => {
   console.error('API Error:', err);
   const statusCode = err.statusCode || 500;
   const status = err.status || (statusCode < 500 ? 'fail' : 'error');
-  
+
   res.status(statusCode).json({
     status: status,
     message: err.message || 'Internal Server Error'

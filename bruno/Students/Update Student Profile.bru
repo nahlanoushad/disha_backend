@@ -1,0 +1,22 @@
+meta {
+  name: Update Student Profile
+  type: http
+  seq: 23
+}
+
+put {
+  url: {{baseUrl}}/api/student/profile
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{student_token}}
+}
+
+body:json {
+  {
+    "name": "Nahla Updated",
+    "phone": "9876543211"
+  }
+}

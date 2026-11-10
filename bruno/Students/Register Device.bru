@@ -1,0 +1,22 @@
+meta {
+  name: Register Device
+  type: http
+  seq: 15
+}
+
+post {
+  url: http://localhost:5000/api/student/notifications/register-device
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhYWU1ZDk1N2VjOWRmZDQ2ODU5NGIyMCIsImVtYWlsIjoibmFobGFub3VzaGFkMDZAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE3ODk4MTM1NDAsImV4cCI6MTc4OTg5OTk0MH0.yDanBoX58yyiVRknpc6ziHjeSFn7rsomEY7ZzYncb8Y
+}
+
+body:json {
+  {
+    "fid": "dfkcjzVn8dA1xEeV6juXvd",
+    "platform": "web"
+  }
+}

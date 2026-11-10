@@ -1,0 +1,21 @@
+meta {
+  name: Delete Device
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/student/notifications/register-device
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+body:json {
+  {
+    "fid": "test_fid_123"
+  }
+}

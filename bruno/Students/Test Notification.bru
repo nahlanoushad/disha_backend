@@ -1,0 +1,15 @@
+meta {
+  name: Test Notification
+  type: http
+  seq: 17
+}
+
+post {
+  url: http://localhost:5000/api/student/notifications/test
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhYWU1ZDk1N2VjOWRmZDQ2ODU5NGIyMCIsImVtYWlsIjoibmFobGFub3VzaGFkMDZAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE3ODk4MzcyNzgsImV4cCI6MTc4OTkyMzY3OH0.FGIWfrA70yl18hlX0xKg2-UMIWh8vAkLmgo6hG4StO8
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Create Entrance Exam
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/entrance-exams
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "name": "GATE 2026",
+    "conductingAuthority": "IIT Roorkee",
+    "eligibilityCriteria": "B.Tech/B.E degree holders",
+    "applicationProcess": "Online",
+    "registrationStartDate": "2025-08-30",
+    "registrationEndDate": "2025-09-30",
+    "examDate": "2026-02-07",
+    "status": "active"
+  }
+}

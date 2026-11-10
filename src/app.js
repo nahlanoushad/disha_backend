@@ -1,7 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
-import collegeRoutes from './routes/collegeRoutes.js';
+import userAuthRoutes from './routes/userAuthRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
+import entranceExamRoutes from './routes/entranceExamRoutes.js';
+import studentAdminRoutes from './routes/studentRoutes.js';
+import studentAuthRoutes from './routes/studentAuthRoutes.js';
+import studentNotificationRoutes from './routes/studentNotificationRoutes.js';
 
 const app = express();
 
@@ -22,7 +29,23 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authentication routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // Admin auth routes
+app.use('/api/auth/user', userAuthRoutes); // User auth routes
+app.use('/api/users', userRoutes); // User profile routes
+
+// Category routes
+app.use('/api/categories', categoryRoutes);
+
+// Course routes
+app.use('/api/courses', courseRoutes);
+
+// Entrance exam routes
+app.use('/api/entrance-exams', entranceExamRoutes);
+
+// Student routes
+app.use('/api/admin/students', studentAdminRoutes);
+app.use('/api/student/notifications', studentNotificationRoutes);
+app.use('/api/student', studentAuthRoutes);
 
 // College routes
 app.use('/api/colleges', collegeRoutes);
@@ -38,8 +61,11 @@ app.use((req, res) => {
 // Central error handler
 app.use((err, req, res, next) => {
   console.error('API Error:', err);
-  res.status(err.statusCode || 500).json({
-    status: 'error',
+  const statusCode = err.statusCode || 500;
+  const status = err.status || (statusCode < 500 ? 'fail' : 'error');
+
+  res.status(statusCode).json({
+    status: status,
     message: err.message || 'Internal Server Error'
   });
 });

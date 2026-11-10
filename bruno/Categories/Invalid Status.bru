@@ -1,0 +1,15 @@
+meta {
+  name: Invalid Status
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/categories?status=something_invalid
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Delete Entrance Exam
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/entrance-exams/650000000000000000000000
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}

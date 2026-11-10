@@ -1,0 +1,27 @@
+meta {
+  name: Create Course - Invalid Category
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/courses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "name": "Invalid Category Course",
+    "category": "65b93d395a123f1b4c999999"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+  adminToken: REPLACE_WITH_VALID_ADMIN_TOKEN
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Invalid Limit
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/categories?limit=500
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

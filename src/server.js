@@ -6,6 +6,7 @@ import app from './app.js';
 import connectDB from './config/db.js';
 import seedAdmin from './utils/seedAdmin.js';
 import seedCategories from './utils/seedCategories.js';
+import { seedCareerDiscoveryQuestions } from './utils/careerAssessmentSeeder.js';
 import reminderSchedulerService from './services/reminderSchedulerService.js';
 
 const PORT = process.env.PORT || 5000;
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   await seedAdmin();
+  await seedCareerDiscoveryQuestions();
 
   // Start automated reminder background worker
   reminderSchedulerService.start();

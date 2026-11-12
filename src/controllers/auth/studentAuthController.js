@@ -46,11 +46,22 @@ const formatStudentResponse = (student) => {
       marksPercentage: '',
       schoolName: ''
     },
-    location: student.location || {
-      state: '',
-      district: '',
-      city: ''
+    location: {
+      displayName: student.location?.displayName || '',
+      locality: student.location?.locality || '',
+      city: student.location?.city || '',
+      district: student.location?.district || '',
+      state: student.location?.state || '',
+      country: student.location?.country || 'India',
+      pincode: student.location?.pincode || '',
+      coordinates: {
+        latitude: student.location?.coordinates?.latitude ?? null,
+        longitude: student.location?.coordinates?.longitude ?? null
+      },
+      source: student.location?.source || ''
     },
+    locationSetupCompleted: Boolean(student.locationSetupCompleted),
+    locationUpdatedAt: student.locationUpdatedAt || null,
     preferences: student.preferences || {
       interestedStreams: [],
       preferredLocations: [],
@@ -243,9 +254,18 @@ export const updateStudentProfile = async (req, res, next) => {
     // Update Location
     if (location && typeof location === 'object') {
       student.location = {
-        state: location.state !== undefined ? String(location.state).trim() : (student.location?.state || ''),
+        displayName: location.displayName !== undefined ? String(location.displayName).trim() : (student.location?.displayName || ''),
+        locality: location.locality !== undefined ? String(location.locality).trim() : (student.location?.locality || ''),
+        city: location.city !== undefined ? String(location.city).trim() : (student.location?.city || ''),
         district: location.district !== undefined ? String(location.district).trim() : (student.location?.district || ''),
-        city: location.city !== undefined ? String(location.city).trim() : (student.location?.city || '')
+        state: location.state !== undefined ? String(location.state).trim() : (student.location?.state || ''),
+        country: location.country !== undefined ? String(location.country).trim() : (student.location?.country || 'India'),
+        pincode: location.pincode !== undefined ? String(location.pincode).trim() : (student.location?.pincode || ''),
+        coordinates: {
+          latitude: location.coordinates?.latitude !== undefined && location.coordinates?.latitude !== null ? Number(location.coordinates.latitude) : (student.location?.coordinates?.latitude ?? null),
+          longitude: location.coordinates?.longitude !== undefined && location.coordinates?.longitude !== null ? Number(location.coordinates.longitude) : (student.location?.coordinates?.longitude ?? null)
+        },
+        source: location.source !== undefined ? String(location.source).trim() : (student.location?.source || '')
       };
     }
 

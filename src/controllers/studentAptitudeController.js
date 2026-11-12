@@ -7,25 +7,39 @@ import { geminiService } from '../services/geminiService.js';
 import mongoose from 'mongoose';
 
 /**
- * Get active assessment questions
+ * Get active published career assessment questions for students
  * GET /api/student/aptitude/questions
- * NOTE: correctAnswer and explanation are omitted by default (select: false)
  */
 export const getQuestions = async (req, res, next) => {
   try {
-    const questions = await AptitudeQuestion.find({ isActive: true })
-      .sort({ order: 1 })
+    // Only published Career Discovery questions are delivered to students
+    const questions = await AptitudeQuestion.find({
+      assessmentType: 'career_discovery',
+      status: 'published',
+      isActive: true
+    })
+      .sort({ order: 1, createdAt: 1 })
       .lean();
 
-    const interestQuestions = questions.filter((q) => q.section === 'interest');
-    const abilityQuestions = questions.filter((q) => q.section === 'ability');
+    if (!questions || questions.length === 0) {
+      return res.status(200).json({
+        status: 'success',
+        isAvailable: false,
+        totalQuestions: 0,
+        message: 'Career assessment is currently being prepared. Please check back soon.',
+        data: {
+          questions: [],
+          allQuestions: []
+        }
+      });
+    }
 
     res.status(200).json({
       status: 'success',
+      isAvailable: true,
       totalQuestions: questions.length,
       data: {
-        interestQuestions,
-        abilityQuestions,
+        questions,
         allQuestions: questions
       }
     });
@@ -41,10 +55,12 @@ export const getQuestions = async (req, res, next) => {
 export const createAttempt = async (req, res, next) => {
   try {
     const studentId = req.student._id;
+    const student = await Student.findById(studentId).lean();
 
-    // Check if there is an in-progress attempt to resume
+    // Check if there is an in-progress Career Discovery attempt to resume
     const inProgress = await AssessmentAttempt.findOne({
       studentId,
+      assessmentType: 'career_discovery',
       completionStatus: 'in_progress'
     }).sort({ updatedAt: -1 });
 
@@ -58,12 +74,21 @@ export const createAttempt = async (req, res, next) => {
       });
     }
 
-    // Otherwise create fresh attempt
+    // Capture student's current academic profile snapshot
+    const studentProfileSnapshot = {
+      stream: student?.academicProfile?.stream || '',
+      subjects: student?.academicProfile?.subjects || [],
+      plusTwoPercentage: student?.academicProfile?.plusTwoPercentage || null
+    };
+
+    // Create fresh Career Discovery attempt
     const newAttempt = await AssessmentAttempt.create({
       studentId,
-      assessmentVersion: 'v1.0',
+      assessmentVersion: 'v2.0',
+      assessmentType: 'career_discovery',
       completionStatus: 'in_progress',
       currentStep: 1,
+      studentProfileSnapshot,
       answers: []
     });
 
@@ -111,12 +136,24 @@ export const getLatestAttempt = async (req, res, next) => {
   try {
     const studentId = req.student._id;
 
-    const latest = await AssessmentAttempt.findOne({
+    // Prefer latest completed v2.0 Career Discovery attempt
+    let latest = await AssessmentAttempt.findOne({
       studentId,
+      assessmentType: 'career_discovery',
       completionStatus: 'completed'
     })
       .sort({ completedAt: -1 })
       .lean();
+
+    // Fall back to any completed attempt (e.g. legacy v1.0)
+    if (!latest) {
+      latest = await AssessmentAttempt.findOne({
+        studentId,
+        completionStatus: 'completed'
+      })
+        .sort({ completedAt: -1 })
+        .lean();
+    }
 
     if (!latest) {
       return res.status(200).json({
@@ -191,7 +228,6 @@ export const updateAttempt = async (req, res, next) => {
       return next(new AppError('Assessment attempt not found', 404));
     }
 
-    // Student isolation check
     if (attempt.studentId.toString() !== studentId.toString()) {
       return next(new AppError('Unauthorized access to this assessment attempt', 403));
     }
@@ -239,7 +275,6 @@ export const submitAttempt = async (req, res, next) => {
       return next(new AppError('Assessment attempt not found', 404));
     }
 
-    // Student isolation check
     if (attempt.studentId.toString() !== studentId.toString()) {
       return next(new AppError('Unauthorized access to this assessment attempt', 403));
     }
@@ -256,18 +291,52 @@ export const submitAttempt = async (req, res, next) => {
       return next(new AppError('Cannot submit assessment with empty answers.', 400));
     }
 
-    // 1. Deterministic Scoring
-    const scoringResult = await aptitudeScoringService.calculateScores(submissionAnswers);
     const student = await Student.findById(studentId).lean();
 
-    // 2. Rule-Based Educational Matching using real MongoDB records
+    // If Career Discovery (v2.0):
+    if (attempt.assessmentType === 'career_discovery' || attempt.assessmentVersion === 'v2.0') {
+      // 1. Deterministic Course Matching based on real MongoDB courses & collected tags
+      const discoveryResult = await aptitudeScoringService.scoreCareerDiscovery({
+        answers: submissionAnswers,
+        student
+      });
+
+      // 2. Gemini Grounded Natural Language Guidance
+      const aiGuidance = await geminiService.generateCareerGuidance({
+        studentProfile: student?.academicProfile || attempt.studentProfileSnapshot,
+        profileSummary: discoveryResult.profileSummary,
+        candidateCourses: discoveryResult.courseRecommendations,
+        candidateColleges: discoveryResult.collegeRecommendations
+      });
+
+      attempt.answers = discoveryResult.gradedAnswers;
+      attempt.courseRecommendations = discoveryResult.courseRecommendations;
+      attempt.collegeRecommendations = discoveryResult.collegeRecommendations;
+      attempt.profileSummary = discoveryResult.profileSummary;
+      attempt.aiAnalysis = aiGuidance;
+      attempt.completionStatus = 'completed';
+      attempt.completedAt = new Date();
+      attempt.currentStep = 5;
+
+      await attempt.save();
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Career Discovery assessment completed successfully',
+        data: {
+          attempt
+        }
+      });
+    }
+
+    // Fallback for legacy v1.0 RIASEC attempts:
+    const scoringResult = await aptitudeScoringService.calculateScores(submissionAnswers);
     const ruleBasedRecommendations = await aptitudeScoringService.generateRuleBasedRecommendations({
       student,
       topInterests: scoringResult.topInterests,
       abilityScores: scoringResult.abilityScores
     });
 
-    // 3. Gemini AI Analysis (anonymized, grounded in MongoDB candidates, safe fallback)
     const aiGuidance = await geminiService.generateGuidance({
       topInterests: scoringResult.topInterests,
       interestScores: scoringResult.interestScores,
@@ -278,7 +347,6 @@ export const submitAttempt = async (req, res, next) => {
       candidateColleges: ruleBasedRecommendations.recommendedColleges
     });
 
-    // 4. Save completed attempt
     attempt.answers = scoringResult.gradedAnswers;
     attempt.interestScores = scoringResult.interestScores;
     attempt.topInterests = scoringResult.topInterests;
@@ -320,6 +388,25 @@ export const retryAiAnalysis = async (req, res, next) => {
 
     const student = await Student.findById(studentId).lean();
 
+    if (attempt.assessmentType === 'career_discovery' || attempt.assessmentVersion === 'v2.0') {
+      const aiGuidance = await geminiService.generateCareerGuidance({
+        studentProfile: student?.academicProfile || attempt.studentProfileSnapshot,
+        profileSummary: attempt.profileSummary,
+        candidateCourses: attempt.courseRecommendations || [],
+        candidateColleges: attempt.collegeRecommendations || []
+      });
+
+      attempt.aiAnalysis = aiGuidance;
+      await attempt.save();
+
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          aiAnalysis: aiGuidance
+        }
+      });
+    }
+
     const aiGuidance = await geminiService.generateGuidance({
       topInterests: attempt.topInterests,
       interestScores: attempt.interestScores,
@@ -343,4 +430,3 @@ export const retryAiAnalysis = async (req, res, next) => {
     next(error);
   }
 };
-

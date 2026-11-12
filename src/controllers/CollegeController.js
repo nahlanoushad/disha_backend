@@ -40,7 +40,56 @@ const formatLocationPayload = (body) => {
     return payload;
 };
 
-// Get all colleges with optional search, filters, and pagination
+// Helper: Haversine distance in kilometers
+const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+    if (lat1 === null || lat1 === undefined || lon1 === null || lon1 === undefined ||
+        lat2 === null || lat2 === undefined || lon2 === null || lon2 === undefined) {
+        return null;
+    }
+    const nLat1 = Number(lat1);
+    const nLon1 = Number(lon1);
+    const nLat2 = Number(lat2);
+    const nLon2 = Number(lon2);
+    if (isNaN(nLat1) || isNaN(nLon1) || isNaN(nLat2) || isNaN(nLon2)) return null;
+
+    const R = 6371; // Earth's radius in km
+    const dLat = (nLat2 - nLat1) * (Math.PI / 180);
+    const dLon = (nLon2 - nLon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(nLat1 * (Math.PI / 180)) *
+        Math.cos(nLat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
+};
+
+// Helper: Determine proximity tier (nearby, district, state, national)
+const determineProximityTier = (distanceKm, college, refCity = '', refDistrict = '', refState = '') => {
+    if (distanceKm !== null) {
+        if (distanceKm <= 50) return 'nearby';
+        if (distanceKm <= 120) return 'district';
+        if (distanceKm <= 450) return 'state';
+        return 'national';
+    }
+
+    const norm = (s) => (s || '').toLowerCase().trim();
+    const cCity = norm(college.city);
+    const cDist = norm(college.district);
+    const cState = norm(college.state);
+    const rCity = norm(refCity);
+    const rDist = norm(refDistrict);
+    const rState = norm(refState);
+
+    if (rCity && (cCity.includes(rCity) || rCity.includes(cCity))) return 'nearby';
+    if (rDist && (cDist.includes(rDist) || rDist.includes(cDist))) return 'district';
+    if (rState && (cState.includes(rState) || rState.includes(cState))) return 'state';
+
+    return 'national';
+};
+
+// Get all colleges with optional search, filters, pagination, and location-aware proximity
 const getColleges = async (req, res) => {
     try {
         const {
@@ -52,7 +101,13 @@ const getColleges = async (req, res) => {
             sort,
             page,
             limit,
-            format
+            format,
+            lat,
+            lng,
+            studentCity,
+            studentDistrict,
+            studentState,
+            maxDistance
         } = req.query;
 
         const filter = {};
@@ -73,8 +128,6 @@ const getColleges = async (req, res) => {
 
         // State filter
         if (state && state.trim() && state.toLowerCase() !== 'all') {
-            filter.$or = filter.$or || [];
-            // Match state field or address substring
             const stateRegex = new RegExp(state.trim(), 'i');
             filter.$and = filter.$and || [];
             filter.$and.push({
@@ -114,34 +167,95 @@ const getColleges = async (req, res) => {
             });
         }
 
-        // Sorting
+        // Determine if reference coordinates exist
+        const hasRefCoords = lat !== undefined && lat !== null && lat !== '' &&
+            lng !== undefined && lng !== null && lng !== '' &&
+            !isNaN(Number(lat)) && !isNaN(Number(lng));
+
+        const refLat = hasRefCoords ? Number(lat) : null;
+        const refLng = hasRefCoords ? Number(lng) : null;
+
+        // Fetch colleges
+        let queryBuilder = College.find(filter)
+            .populate('courses', 'name duration eligibility feeStructure');
+
+        // Initial database sorting
         let sortOption = { createdAt: -1 };
         if (sort === 'name_asc') sortOption = { name: 1 };
         if (sort === 'name_desc') sortOption = { name: -1 };
         if (sort === 'ranking') sortOption = { ranking: 1, name: 1 };
 
-        // Pagination if requested
-        const hasPagination = page !== undefined || limit !== undefined || format === 'envelope';
-        const pageNum = Math.max(1, parseInt(page) || 1);
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
-        const skip = (pageNum - 1) * limitNum;
+        const allMatchingColleges = await queryBuilder.sort(sortOption);
 
-        const totalItems = await College.countDocuments(filter);
+        // Attach computed distanceKm and proximityTier
+        let augmented = allMatchingColleges.map((col) => {
+            const doc = col.toObject ? col.toObject() : { ...col };
+            const cLat = doc.location?.latitude;
+            const cLng = doc.location?.longitude;
 
-        let queryBuilder = College.find(filter)
-            .sort(sortOption)
-            .populate('courses', 'name duration eligibility feeStructure');
+            const distanceKm = hasRefCoords
+                ? calculateDistanceKm(refLat, refLng, cLat, cLng)
+                : null;
 
-        if (hasPagination) {
-            queryBuilder = queryBuilder.skip(skip).limit(limitNum);
+            const proximityTier = determineProximityTier(
+                distanceKm,
+                doc,
+                studentCity,
+                studentDistrict,
+                studentState
+            );
+
+            return {
+                ...doc,
+                distanceKm,
+                proximityTier
+            };
+        });
+
+        // Filter by maxDistance if requested
+        if (maxDistance && maxDistance !== 'all' && !isNaN(Number(maxDistance))) {
+            const maxD = Number(maxDistance);
+            augmented = augmented.filter((c) => {
+                if (c.distanceKm !== null) return c.distanceKm <= maxD;
+                // If coordinate is absent, allow if district/city matches
+                return c.proximityTier === 'nearby' || c.proximityTier === 'district';
+            });
         }
 
-        const colleges = await queryBuilder;
+        // Proximity sorting when sort === 'distance' or default with coordinates
+        if (sort === 'distance' || (hasRefCoords && (!sort || sort === 'default' || sort === 'proximity'))) {
+            const tierOrder = { nearby: 1, district: 2, state: 3, national: 4 };
+            augmented.sort((a, b) => {
+                // If both have distanceKm, sort by exact distance
+                if (a.distanceKm !== null && b.distanceKm !== null) {
+                    return a.distanceKm - b.distanceKm;
+                }
+                // If one has distanceKm and other does not, rank by tier
+                const tierA = tierOrder[a.proximityTier] || 4;
+                const tierB = tierOrder[b.proximityTier] || 4;
+                if (tierA !== tierB) return tierA - tierB;
+                if (a.distanceKm !== null) return -1;
+                if (b.distanceKm !== null) return 1;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+        }
+
+        const totalItems = augmented.length;
+
+        // Pagination if requested
+        const hasPagination = page !== undefined || limit !== undefined || format === 'envelope';
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+        const skip = (pageNum - 1) * limitNum;
+
+        const paginatedColleges = hasPagination
+            ? augmented.slice(skip, skip + limitNum)
+            : augmented;
 
         if (hasPagination) {
             return res.status(200).json({
                 status: 'success',
-                results: colleges.length,
+                results: paginatedColleges.length,
                 totalItems,
                 pagination: {
                     page: pageNum,
@@ -150,13 +264,13 @@ const getColleges = async (req, res) => {
                     totalItems
                 },
                 data: {
-                    colleges
+                    colleges: paginatedColleges
                 }
             });
         }
 
-        // Backward-compatible default: return JSON array directly
-        res.status(200).json(colleges);
+        // Backward-compatible default
+        res.status(200).json(paginatedColleges);
     } catch (error) {
         res.status(500).json({
             message: error.message

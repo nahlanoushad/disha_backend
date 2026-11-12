@@ -54,9 +54,30 @@ const StudentSchema = new mongoose.Schema(
       schoolName: { type: String, trim: true, default: '' }
     },
     location: {
-      state: { type: String, trim: true, default: '' },
+      displayName: { type: String, trim: true, default: '' },
+      locality: { type: String, trim: true, default: '' },
+      city: { type: String, trim: true, default: '' },
       district: { type: String, trim: true, default: '' },
-      city: { type: String, trim: true, default: '' }
+      state: { type: String, trim: true, default: '' },
+      country: { type: String, trim: true, default: 'India' },
+      pincode: { type: String, trim: true, default: '' },
+      coordinates: {
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null }
+      },
+      source: {
+        type: String,
+        enum: ['manual', 'search', 'map', 'geolocation', ''],
+        default: ''
+      }
+    },
+    locationSetupCompleted: {
+      type: Boolean,
+      default: false
+    },
+    locationUpdatedAt: {
+      type: Date,
+      default: null
     },
     preferences: {
       interestedStreams: { type: [String], default: [] },

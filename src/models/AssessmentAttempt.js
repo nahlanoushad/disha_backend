@@ -7,18 +7,29 @@ const answerItemSchema = new mongoose.Schema(
       ref: 'AptitudeQuestion',
       required: true
     },
+    questionText: {
+      type: String,
+      default: ''
+    },
     section: {
       type: String,
-      enum: ['interest', 'ability'],
-      required: true
+      default: 'general'
     },
     category: {
       type: String,
-      required: true
+      default: 'General'
     },
     selectedOption: {
       type: mongoose.Schema.Types.Mixed,
-      required: true
+      default: null
+    },
+    selectedOptions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    tags: {
+      type: [String],
+      default: []
     },
     isCorrect: {
       type: Boolean,
@@ -27,6 +38,62 @@ const answerItemSchema = new mongoose.Schema(
     marksAwarded: {
       type: Number,
       default: 0
+    }
+  },
+  { _id: false }
+);
+
+const courseRecommendationSchema = new mongoose.Schema(
+  {
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Course',
+      required: true
+    },
+    courseName: {
+      type: String,
+      required: true
+    },
+    category: {
+      type: String,
+      default: 'General'
+    },
+    duration: {
+      type: String,
+      default: ''
+    },
+    eligibility: {
+      type: String,
+      default: ''
+    },
+    feeStructure: {
+      type: String,
+      default: ''
+    },
+    expectedSalaryRange: {
+      type: String,
+      default: ''
+    },
+    indicativeScore: {
+      type: Number,
+      default: 80
+    },
+    matchLevel: {
+      type: String,
+      enum: ['Top Recommendation', 'Strong Match', 'Good Match', 'Worth Exploring'],
+      default: 'Strong Match'
+    },
+    matchReasons: {
+      type: [String],
+      default: []
+    },
+    careerOpportunities: {
+      type: [String],
+      default: []
+    },
+    entranceExams: {
+      type: [String],
+      default: []
     }
   },
   { _id: false }
@@ -42,7 +109,12 @@ const assessmentAttemptSchema = new mongoose.Schema(
     },
     assessmentVersion: {
       type: String,
-      default: 'v1.0'
+      default: 'v2.0'
+    },
+    assessmentType: {
+      type: String,
+      enum: ['career_discovery', 'riasec'],
+      default: 'career_discovery'
     },
     completionStatus: {
       type: String,
@@ -52,11 +124,41 @@ const assessmentAttemptSchema = new mongoose.Schema(
     },
     currentStep: {
       type: Number,
-      default: 1 // 1: Intro, 2: Interest, 3: Ability, 4: Review, 5: Completed
+      default: 1
+    },
+    // Snapshot of student profile at the time of assessment
+    studentProfileSnapshot: {
+      stream: { type: String, default: '' },
+      subjects: { type: [String], default: [] },
+      plusTwoPercentage: { type: Number, default: null }
     },
     answers: [answerItemSchema],
 
-    // Deterministic RIASEC Interest Scores
+    // V2.0 Direct Undergraduate Course Recommendations
+    courseRecommendations: [courseRecommendationSchema],
+
+    // Recommended Colleges mapped to top courses
+    collegeRecommendations: [
+      {
+        collegeId: { type: mongoose.Schema.Types.ObjectId, ref: 'College' },
+        collegeName: String,
+        matchedCourse: String,
+        district: String,
+        state: String,
+        type: String,
+        matchReasons: [String]
+      }
+    ],
+
+    // Summary of top tags and student's identified strengths
+    profileSummary: {
+      topInterests: { type: [String], default: [] },
+      enjoyedSubjects: { type: [String], default: [] },
+      workStylePreferences: { type: [String], default: [] },
+      strengths: { type: [String], default: [] }
+    },
+
+    // Legacy RIASEC Fields (preserved for v1.0 attempts)
     interestScores: {
       Realistic: { score: Number, maxScore: Number, percentage: Number },
       Investigative: { score: Number, maxScore: Number, percentage: Number },
@@ -73,8 +175,6 @@ const assessmentAttemptSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
-
-    // Deterministic Ability Assessment Scores
     abilityScores: {
       logicalReasoning: { score: Number, maxScore: Number, percentage: Number },
       numericalReasoning: { score: Number, maxScore: Number, percentage: Number },
@@ -84,42 +184,12 @@ const assessmentAttemptSchema = new mongoose.Schema(
       totalMaxScore: { type: Number, default: 0 },
       overallPercentage: { type: Number, default: 0 }
     },
-
-    // Factual Rule-Based Recommendations (Direct from MongoDB Courses & Colleges)
     ruleBasedRecommendations: {
-      recommendedCourses: [
-        {
-          courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
-          courseName: String,
-          category: String,
-          duration: String,
-          indicativeScore: Number,
-          matchReasons: [String]
-        }
-      ],
-      recommendedColleges: [
-        {
-          collegeId: { type: mongoose.Schema.Types.ObjectId, ref: 'College' },
-          collegeName: String,
-          matchedCourse: String,
-          district: String,
-          state: String,
-          type: String,
-          matchReasons: [String]
-        }
-      ],
-      strengths: [String],
-      improvementAreas: [String],
-      careerFamilies: [
-        {
-          title: String,
-          description: String,
-          suitableRoles: [String]
-        }
-      ]
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     },
 
-    // Gemini AI Analysis and Guidance
+    // AI Analysis (Gemini grounded explanations)
     aiAnalysis: {
       status: {
         type: String,
@@ -130,15 +200,11 @@ const assessmentAttemptSchema = new mongoose.Schema(
         type: String,
         default: ''
       },
-      interestInterpretation: {
+      studentSummary: {
         type: String,
         default: ''
       },
-      strengthsSummary: {
-        type: String,
-        default: ''
-      },
-      growthAreas: {
+      whyTheseCourses: {
         type: String,
         default: ''
       },
@@ -146,10 +212,14 @@ const assessmentAttemptSchema = new mongoose.Schema(
         type: String,
         default: ''
       },
-      personalizedExplanation: {
+      growthAreas: {
         type: String,
         default: ''
       },
+      // Legacy fields
+      interestInterpretation: { type: String, default: '' },
+      strengthsSummary: { type: String, default: '' },
+      personalizedExplanation: { type: String, default: '' },
       generatedAt: {
         type: Date,
         default: null
@@ -180,4 +250,3 @@ assessmentAttemptSchema.index({ studentId: 1, createdAt: -1 });
 const AssessmentAttempt = mongoose.model('AssessmentAttempt', assessmentAttemptSchema);
 
 export default AssessmentAttempt;
-

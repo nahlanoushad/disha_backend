@@ -41,6 +41,53 @@ const StudentSchema = new mongoose.Schema(
     profileCompleted: {
       type: Boolean,
       default: false
+    },
+    // Extended Academic & Career Guidance Profile
+    academicProfile: {
+      qualification: { type: String, trim: true, default: '' },
+      plusTwoStatus: { type: String, trim: true, default: '' },
+      board: { type: String, trim: true, default: '' },
+      stream: { type: String, trim: true, default: '' },
+      subjects: { type: [String], default: [] },
+      passingYear: { type: String, trim: true, default: '' },
+      marksPercentage: { type: String, trim: true, default: '' },
+      schoolName: { type: String, trim: true, default: '' }
+    },
+    location: {
+      displayName: { type: String, trim: true, default: '' },
+      locality: { type: String, trim: true, default: '' },
+      city: { type: String, trim: true, default: '' },
+      district: { type: String, trim: true, default: '' },
+      state: { type: String, trim: true, default: '' },
+      country: { type: String, trim: true, default: 'India' },
+      pincode: { type: String, trim: true, default: '' },
+      coordinates: {
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null }
+      },
+      source: {
+        type: String,
+        enum: ['manual', 'search', 'map', 'geolocation', ''],
+        default: ''
+      }
+    },
+    locationSetupCompleted: {
+      type: Boolean,
+      default: false
+    },
+    locationUpdatedAt: {
+      type: Date,
+      default: null
+    },
+    preferences: {
+      interestedStreams: { type: [String], default: [] },
+      preferredLocations: { type: [String], default: [] },
+      budgetRange: { type: String, trim: true, default: '' },
+      preferredDuration: { type: String, trim: true, default: '' }
+    },
+    interests: {
+      type: [String],
+      default: []
     }
   },
   {

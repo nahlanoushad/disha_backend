@@ -21,11 +21,22 @@ export const getAllCourses = async (query = {}) => {
     }
     filter.category = query.category;
   }
+
+  if (query.duration && query.duration !== 'all') {
+    filter.duration = { $regex: query.duration.trim(), $options: 'i' };
+  }
+
+  if (query.eligibility && query.eligibility !== 'all') {
+    filter.eligibility = { $regex: query.eligibility.trim(), $options: 'i' };
+  }
   
   if (query.search) {
+    const sRegex = { $regex: query.search.trim(), $options: 'i' };
     filter.$or = [
-      { name: { $regex: query.search, $options: 'i' } },
-      { description: { $regex: query.search, $options: 'i' } }
+      { name: sRegex },
+      { description: sRegex },
+      { careerOpportunities: sRegex },
+      { eligibility: sRegex }
     ];
   }
 

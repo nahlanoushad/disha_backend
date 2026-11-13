@@ -7,7 +7,7 @@ import * as courseService from '../services/courseService.js';
  */
 export const getAllCourses = async (req, res, next) => {
   try {
-    let { search, status, category, page, limit } = req.query;
+    let { search, status, category, duration, eligibility, page, limit } = req.query;
 
     if (search) {
       search = search.trim();
@@ -38,6 +38,8 @@ export const getAllCourses = async (req, res, next) => {
       search,
       status,
       category,
+      duration,
+      eligibility,
       page: parsedPage || 1,
       limit: parsedLimit || 10
     });

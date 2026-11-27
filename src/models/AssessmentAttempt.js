@@ -145,7 +145,9 @@ const assessmentAttemptSchema = new mongoose.Schema(
         matchedCourse: String,
         district: String,
         state: String,
-        type: String,
+        // Must be declared this way: a bare `type: String` makes Mongoose treat
+        // the whole list item as a string.
+        type: { type: String },
         matchReasons: [String]
       }
     ],

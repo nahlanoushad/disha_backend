@@ -1,43 +1,45 @@
+import mongoose from 'mongoose';
 import College from '../models/College.js';
+import AppError from '../utils/appError.js';
+import { parseCollegePayload } from '../utils/collegePayload.js';
 
-// Helper to format/normalize location payload
-const formatLocationPayload = (body) => {
-    const payload = { ...body };
+// User input must be escaped before it is used inside a regular expression
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    let address = '';
-    let latitude = null;
-    let longitude = null;
+// Query values can arrive as arrays/objects (?search[]=x); only accept plain text
+const queryText = (value) => (typeof value === 'string' ? value.trim() : '');
 
-    if (typeof body.location === 'object' && body.location !== null) {
-        address = body.location.address || '';
-        latitude = body.location.latitude !== undefined && body.location.latitude !== '' ? Number(body.location.latitude) : null;
-        longitude = body.location.longitude !== undefined && body.location.longitude !== '' ? Number(body.location.longitude) : null;
-    } else if (typeof body.location === 'string') {
-        address = body.location;
+const assertValidId = (id) => {
+    if (!mongoose.isValidObjectId(id)) throw new AppError('Invalid college ID format', 400);
+};
+
+// Coordinates are only usable as a pair
+const assertCoordinatePair = (location) => {
+    const hasLatitude = location?.latitude !== null && location?.latitude !== undefined;
+    const hasLongitude = location?.longitude !== null && location?.longitude !== undefined;
+    if (hasLatitude !== hasLongitude) {
+        throw new AppError('Provide both latitude and longitude, or neither', 400);
     }
+};
 
-    if (body.latitude !== undefined && body.latitude !== '' && body.latitude !== null) {
-        latitude = Number(body.latitude);
-    }
-    if (body.longitude !== undefined && body.longitude !== '' && body.longitude !== null) {
-        longitude = Number(body.longitude);
-    }
-
-    if (body.address) {
-        address = body.address;
-    }
-
-    payload.location = {
-        address,
-        latitude,
-        longitude
+// Same name in the same district is treated as the same college
+const assertNotDuplicate = async ({ name, district }, excludeId) => {
+    const filter = {
+        name: new RegExp(`^${escapeRegex(name)}$`, 'i'),
+        district: new RegExp(`^${escapeRegex(district || '')}$`, 'i')
     };
+    if (excludeId) filter._id = { $ne: excludeId };
+    if (await College.exists(filter)) {
+        throw new AppError(`College "${name}" already exists in this district`, 409);
+    }
+};
 
-    delete payload.latitude;
-    delete payload.longitude;
-    delete payload.address;
-
-    return payload;
+// Turn schema errors into 400s; everything else goes to the central error handler
+const handleError = (error, next) => {
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+        return next(new AppError(error.message, 400));
+    }
+    return next(error);
 };
 
 // Helper: Haversine distance in kilometers
@@ -90,7 +92,7 @@ const determineProximityTier = (distanceKm, college, refCity = '', refDistrict =
 };
 
 // Get all colleges with optional search, filters, pagination, and location-aware proximity
-const getColleges = async (req, res) => {
+const getColleges = async (req, res, next) => {
     try {
         const {
             search,
@@ -111,10 +113,15 @@ const getColleges = async (req, res) => {
         } = req.query;
 
         const filter = {};
+        const searchText = queryText(search);
+        const stateText = queryText(state);
+        const districtText = queryText(district);
+        const typeText = queryText(type);
+        const courseText = queryText(course);
 
         // Search across college name, address, courses, city, district
-        if (search && search.trim()) {
-            const searchRegex = new RegExp(search.trim(), 'i');
+        if (searchText) {
+            const searchRegex = new RegExp(escapeRegex(searchText), 'i');
             filter.$or = [
                 { name: searchRegex },
                 { 'location.address': searchRegex },
@@ -127,8 +134,8 @@ const getColleges = async (req, res) => {
         }
 
         // State filter
-        if (state && state.trim() && state.toLowerCase() !== 'all') {
-            const stateRegex = new RegExp(state.trim(), 'i');
+        if (stateText && stateText.toLowerCase() !== 'all') {
+            const stateRegex = new RegExp(escapeRegex(stateText), 'i');
             filter.$and = filter.$and || [];
             filter.$and.push({
                 $or: [
@@ -139,8 +146,8 @@ const getColleges = async (req, res) => {
         }
 
         // District filter
-        if (district && district.trim() && district.toLowerCase() !== 'all') {
-            const distRegex = new RegExp(district.trim(), 'i');
+        if (districtText && districtText.toLowerCase() !== 'all') {
+            const distRegex = new RegExp(escapeRegex(districtText), 'i');
             filter.$and = filter.$and || [];
             filter.$and.push({
                 $or: [
@@ -152,19 +159,14 @@ const getColleges = async (req, res) => {
         }
 
         // Type filter (Government, Private, Aided, Autonomous, etc.)
-        if (type && type.trim() && type.toLowerCase() !== 'all') {
-            filter.type = new RegExp(`^${type.trim()}$`, 'i');
+        if (typeText && typeText.toLowerCase() !== 'all') {
+            filter.type = new RegExp(`^${escapeRegex(typeText)}$`, 'i');
         }
 
         // Course filter
-        if (course && course.trim() && course.toLowerCase() !== 'all') {
-            const courseRegex = new RegExp(course.trim(), 'i');
+        if (courseText && courseText.toLowerCase() !== 'all') {
             filter.$and = filter.$and || [];
-            filter.$and.push({
-                $or: [
-                    { coursesOffered: courseRegex }
-                ]
-            });
+            filter.$and.push({ coursesOffered: new RegExp(escapeRegex(courseText), 'i') });
         }
 
         // Determine if reference coordinates exist
@@ -272,91 +274,79 @@ const getColleges = async (req, res) => {
         // Backward-compatible default
         res.status(200).json(paginatedColleges);
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        handleError(error, next);
     }
 };
 
 // Get one college by ID
-const getCollegeById = async (req, res) => {
+const getCollegeById = async (req, res, next) => {
     try {
+        assertValidId(req.params.id);
         const college = await College.findById(req.params.id)
             .populate('courses', 'name duration eligibility feeStructure');
 
-        if (!college) {
-            return res.status(404).json({
-                message: 'College not found'
-            });
-        }
+        if (!college) throw new AppError('College not found', 404);
 
         res.status(200).json(college);
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        handleError(error, next);
     }
 };
 
 // Create a new college
-const createCollege = async (req, res) => {
+const createCollege = async (req, res, next) => {
     try {
-        const formattedData = formatLocationPayload(req.body);
-        const college = await College.create(formattedData);
+        const { data, location } = parseCollegePayload(req.body);
+        assertCoordinatePair(location);
+        await assertNotDuplicate(data);
+
+        const college = await College.create({ ...data, location });
 
         res.status(201).json(college);
     } catch (error) {
-        res.status(400).json({
-            message: error.message
-        });
+        handleError(error, next);
     }
 };
 
-// Update a college
-const updateCollege = async (req, res) => {
+// Update a college (only the fields that were sent)
+const updateCollege = async (req, res, next) => {
     try {
-        const formattedData = formatLocationPayload(req.body);
-        const college = await College.findByIdAndUpdate(
-            req.params.id,
-            formattedData,
-            {
-                new: true,
-                runValidators: true
-            }
-        );
+        assertValidId(req.params.id);
+        const { data, location } = parseCollegePayload(req.body, { partial: true });
 
-        if (!college) {
-            return res.status(404).json({
-                message: 'College not found'
-            });
+        const college = await College.findById(req.params.id);
+        if (!college) throw new AppError('College not found', 404);
+
+        college.set(data);
+        for (const [key, value] of Object.entries(location)) {
+            college.set(`location.${key}`, value);
         }
+        assertCoordinatePair(college.location);
+        if (data.name !== undefined || data.district !== undefined) {
+            await assertNotDuplicate(college, college._id);
+        }
+
+        await college.save();
 
         res.status(200).json(college);
     } catch (error) {
-        res.status(400).json({
-            message: error.message
-        });
+        handleError(error, next);
     }
 };
 
 // Delete a college
-const deleteCollege = async (req, res) => {
+const deleteCollege = async (req, res, next) => {
     try {
+        assertValidId(req.params.id);
         const college = await College.findByIdAndDelete(req.params.id);
 
-        if (!college) {
-            return res.status(404).json({
-                message: 'College not found'
-            });
-        }
+        if (!college) throw new AppError('College not found', 404);
 
         res.status(200).json({
             message: 'College deleted successfully'
         });
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        handleError(error, next);
     }
 };
 

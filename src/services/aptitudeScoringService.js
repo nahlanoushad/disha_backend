@@ -96,7 +96,11 @@ export const aptitudeScoringService = {
 
     // Load real active courses from MongoDB
     const courses = await Course.find({ status: 'active' }).populate('category').lean();
-    const colleges = await College.find({ status: 'active' }).lean();
+    // Colleges have no status field. Recommend all except those not yet verified
+    // ($nin also keeps older records that have no verificationStatus).
+    const colleges = await College.find({
+      verificationStatus: { $nin: ['Pending Verification', 'Unverified'] }
+    }).lean();
 
     const scoredCourses = [];
 
@@ -271,7 +275,9 @@ export const aptitudeScoringService = {
         : [];
 
       for (const targetCourse of targetCourseNames) {
-        const matches = offered.some((o) => new RegExp(targetCourse.replace(/([()])/g, '\\$1'), 'i').test(o));
+        // Escape the whole name so courses like "C++ Programming" don't break the pattern
+        const pattern = new RegExp(targetCourse.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const matches = offered.some((o) => pattern.test(o));
         if (matches) {
           const reasons = [`Offers verified program in ${targetCourse}.`];
           if (college.naacGrade) reasons.push(`NAAC ${college.naacGrade} accredited institution.`);

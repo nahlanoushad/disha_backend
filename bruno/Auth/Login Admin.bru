@@ -17,7 +17,7 @@ headers {
 body:json {
   {
     "email": "admin@disha.edu",
-    "password": "admin@1234#"
+    "password": "{{adminPassword}}"
   }
 }
 
@@ -28,5 +28,6 @@ vars:pre-request {
 script:post-response {
   if (res.status === 200 && res.body.token) {
     bru.setEnvVar("token", res.body.token);
+    bru.setEnvVar("adminToken", res.body.token);
   }
 }

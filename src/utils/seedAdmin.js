@@ -6,7 +6,7 @@ import Admin from '../models/Admin.js';
 export const seedAdmin = async () => {
   try {
     const email = (process.env.ADMIN_EMAIL || 'admin@disha.edu').toLowerCase().trim();
-    const password = process.env.ADMIN_PASSWORD || 'admin@1234#';
+    const password = process.env.ADMIN_PASSWORD; // no default: never create a guessable admin
     const username = process.env.ADMIN_USERNAME || 'admin';
     const name = 'System Administrator';
 
@@ -14,6 +14,11 @@ export const seedAdmin = async () => {
     let admin = await Admin.findOne({ email });
 
     if (!admin) {
+      if (!password) {
+        console.warn('[Seed] ADMIN_PASSWORD is not set. Skipping admin account creation.');
+        return;
+      }
+
       // 2. Check if a legacy admin document exists (e.g., has username but missing email)
       const existingByUsername = await Admin.findOne({ username });
       if (existingByUsername) {

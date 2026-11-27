@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from './jwtSecret.js';
 
 /**
  * Generate a JWT token for an admin
@@ -8,7 +9,7 @@ import jwt from 'jsonwebtoken';
 export const generateToken = ({ id, email, role }) => {
   return jwt.sign(
     { id, email, role },
-    process.env.JWT_SECRET || 'disha_default_jwt_secret',
+    getJwtSecret(),
     {
       expiresIn: process.env.JWT_EXPIRES_IN || '1d'
     }

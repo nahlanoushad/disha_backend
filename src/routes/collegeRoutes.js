@@ -7,6 +7,7 @@ import {
     updateCollege,
     deleteCollege
 } from '../controllers/CollegeController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -16,13 +17,13 @@ router.get('/', getColleges);
 // Get one college by ID
 router.get('/:id', getCollegeById);
 
-// Create a new college
-router.post('/', createCollege);
+// Create a new college (admin only)
+router.post('/', protect, createCollege);
 
-// Update a college
-router.put('/:id', updateCollege);
+// Update a college (admin only)
+router.put('/:id', protect, updateCollege);
 
-// Delete a college
-router.delete('/:id', deleteCollege);
+// Delete a college (admin only)
+router.delete('/:id', protect, deleteCollege);
 
 export default router;

@@ -15,4 +15,7 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Firebase service-account keys (full admin access to the project)
 config/firebase-secret.json
+src/config/firebase-secret.json
+*firebase-adminsdk*.json

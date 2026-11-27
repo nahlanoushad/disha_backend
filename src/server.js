@@ -8,11 +8,13 @@ import seedAdmin from './utils/seedAdmin.js';
 import seedCategories from './utils/seedCategories.js';
 import { seedCareerDiscoveryQuestions } from './utils/careerAssessmentSeeder.js';
 import reminderSchedulerService from './services/reminderSchedulerService.js';
+import { getJwtSecret } from './utils/jwtSecret.js';
 
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
 const startServer = async () => {
+  getJwtSecret(); // fail fast if the signing secret is not configured
   await connectDB();
   await seedAdmin();
   await seedCareerDiscoveryQuestions();

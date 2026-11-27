@@ -14,10 +14,23 @@ const deviceInstallationSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
+    // FCM registration token: the preferred send target. fid stays the device's
+    // identity (and the fallback target), so a rotated token just overwrites this.
+    fcmToken: {
+      type: String,
+      default: ''
+    },
     platform: {
       type: String,
       default: 'web'
     },
+    // false after the student logs out on this device. It stays registered
+    // (isActive) for announcements; personal messages only go to logged-in devices.
+    loggedIn: {
+      type: Boolean,
+      default: true
+    },
+    // false once FCM reports the device as unregistered
     isActive: {
       type: Boolean,
       default: true

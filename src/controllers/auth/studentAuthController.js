@@ -1,5 +1,14 @@
 import Student from '../../models/Student.js';
 import generateToken from '../../utils/generateToken.js';
+import AppError from '../../utils/appError.js';
+import { fcmService } from '../../services/fcmService.js';
+import {
+  sendVerificationOtp,
+  verifyStudentOtp,
+  secondsUntilResend,
+  OTP_TTL_MINUTES,
+  OTP_RESEND_SECONDS
+} from '../../services/studentOtpService.js';
 
 /**
  * Calculate actual profile completion percentage based on filled fields
@@ -75,14 +84,22 @@ const formatStudentResponse = (student) => {
   };
 };
 
+const text = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const issueToken = (student) =>
+  generateToken({ id: student._id, email: student.email, role: 'student' });
+
 /**
- * @desc    Student registration
+ * @desc    Student registration. Emails a code that must be confirmed before sign-in.
  * @route   POST /api/student/auth/register
  * @access  Public
  */
 export const registerStudent = async (req, res, next) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const name = text(req.body.name);
+    const email = text(req.body.email).toLowerCase();
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    const phone = text(req.body.phone);
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -91,29 +108,128 @@ export const registerStudent = async (req, res, next) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    let student = await Student.findOne({ email }).select('+otpSentAt');
 
-    const existingStudent = await Student.findOne({ email: normalizedEmail });
-    if (existingStudent) {
+    if (student && student.isVerified !== false) {
       return res.status(400).json({
         status: 'fail',
         message: 'Email is already registered'
       });
     }
 
-    const student = await Student.create({
-      name: name.trim(),
-      email: normalizedEmail,
-      password,
-      phone: phone ? phone.trim() : ''
-    });
+    if (student) {
+      // Signed up earlier but never verified: take the new details and send a fresh code
+      const wait = secondsUntilResend(student);
+      if (wait > 0) {
+        return next(new AppError(`A code was just sent. Please wait ${wait} seconds and try again.`, 429));
+      }
+      student.set({ name, password, phone });
+    } else {
+      student = new Student({ name, email, password, phone, isVerified: false });
+    }
+
+    try {
+      await student.validate();
+    } catch (error) {
+      return next(new AppError(Object.values(error.errors || {})[0]?.message || error.message, 400));
+    }
+
+    await sendVerificationOtp(student);
 
     res.status(201).json({
       status: 'success',
-      message: 'Student registered successfully',
+      message: 'Verification code sent to your email.',
       data: {
-        student: formatStudentResponse(student)
+        email: student.email,
+        verificationRequired: true,
+        expiresInMinutes: OTP_TTL_MINUTES
       }
+    });
+  } catch (error) {
+    // Two sign-ups for the same email at the same moment
+    if (error.code === 11000) return next(new AppError('Email is already registered', 400));
+    next(error);
+  }
+};
+
+/**
+ * @desc    Confirm the emailed code, save this device's FCM token, and sign in
+ * @route   POST /api/student/auth/verify-otp
+ * @access  Public
+ */
+export const verifyStudentEmail = async (req, res, next) => {
+  try {
+    const email = text(req.body.email).toLowerCase();
+    const otp = text(req.body.otp);
+
+    if (!email || !/^\d{6}$/.test(otp)) {
+      return next(new AppError('Email and the 6-digit code are required', 400));
+    }
+
+    const student = await verifyStudentOtp(email, otp);
+
+    // Push registration is optional: a problem here must not block verification
+    const fcmToken = text(req.body.fcmToken);
+    const fid = text(req.body.fid);
+    let deviceRegistered = false;
+
+    if (fcmToken || fid) {
+      try {
+        await fcmService.registerDevice(
+          student._id,
+          fid || fcmToken,
+          text(req.body.platform) || 'web',
+          fcmToken
+        );
+        deviceRegistered = true;
+      } catch (error) {
+        console.error('Could not register device during verification:', error.message);
+      }
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Email verified successfully',
+      token: issueToken(student),
+      data: {
+        student: formatStudentResponse(student),
+        deviceRegistered
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Email a new verification code
+ * @route   POST /api/student/auth/resend-otp
+ * @access  Public
+ */
+export const resendStudentOtp = async (req, res, next) => {
+  try {
+    const email = text(req.body.email).toLowerCase();
+    if (!email) return next(new AppError('Email is required', 400));
+
+    const student = await Student.findOne({ email }).select('+otpSentAt');
+
+    if (student && student.isActive && student.isVerified === false) {
+      const wait = secondsUntilResend(student);
+      if (wait > 0) {
+        return res.status(429).json({
+          status: 'fail',
+          message: `Please wait ${wait} seconds before requesting another code.`,
+          retryAfter: wait
+        });
+      }
+      await sendVerificationOtp(student);
+    }
+
+    // Same answer for unknown or already verified emails
+    res.status(200).json({
+      status: 'success',
+      message: 'If this email is awaiting verification, a new code has been sent.',
+      retryAfter: OTP_RESEND_SECONDS
     });
   } catch (error) {
     next(error);
@@ -164,16 +280,21 @@ export const loginStudent = async (req, res, next) => {
       });
     }
 
+    // Checked after the password so only the account owner learns this
+    if (student.isVerified === false) {
+      return res.status(403).json({
+        status: 'fail',
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Please verify your email address before signing in.'
+      });
+    }
+
     // Update last login
     student.lastLogin = new Date();
     await student.save({ validateBeforeSave: false });
 
     // Generate JWT token with role explicitly set to 'student'
-    const token = generateToken({
-      id: student._id,
-      email: student.email,
-      role: 'student'
-    });
+    const token = issueToken(student);
 
     res.status(200).json({
       status: 'success',

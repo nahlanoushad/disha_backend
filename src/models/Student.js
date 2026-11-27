@@ -38,6 +38,16 @@ const StudentSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    // Defaults to true so accounts created before email verification keep working.
+    // Registration sets it to false until the emailed code is confirmed.
+    isVerified: {
+      type: Boolean,
+      default: true
+    },
+    otpHash: { type: String, select: false },
+    otpExpires: { type: Date, select: false },
+    otpAttempts: { type: Number, select: false },
+    otpSentAt: { type: Date, select: false },
     profileCompleted: {
       type: Boolean,
       default: false

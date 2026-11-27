@@ -7,16 +7,20 @@ export const registerDevice = async (req, res) => {
   try {
     // req.student is attached by protectStudent middleware
     const studentId = req.student._id;
-    const { fid, platform } = req.body;
+    const { fid, fcmToken, platform } = req.body;
 
-    if (!fid) {
+    // The installation ID identifies the device; if the browser couldn't provide
+    // one, use the registration token as the identifier.
+    const deviceId = fid || fcmToken;
+
+    if (typeof deviceId !== 'string' || !deviceId || (fcmToken && typeof fcmToken !== 'string')) {
       return res.status(400).json({
         status: 'fail',
-        message: 'Firebase Installation ID (fid) is required.'
+        message: 'A Firebase Installation ID (fid) or an FCM token (fcmToken) is required.'
       });
     }
 
-    const device = await fcmService.registerDevice(studentId, fid, platform);
+    const device = await fcmService.registerDevice(studentId, deviceId, platform, fcmToken);
 
     res.status(200).json({
       status: 'success',
@@ -35,21 +39,21 @@ export const registerDevice = async (req, res) => {
 };
 
 /**
- * Deactivate a device FID for the authenticated student
+ * Mark the authenticated student's device as logged out
  */
 export const deactivateDevice = async (req, res) => {
   try {
     const studentId = req.student._id;
     const { fid } = req.body;
 
-    if (!fid) {
+    if (typeof fid !== 'string' || !fid) {
       return res.status(400).json({
         status: 'fail',
         message: 'Firebase Installation ID (fid) is required.'
       });
     }
 
-    const device = await fcmService.deactivateDevice(studentId, fid);
+    const device = await fcmService.markDeviceLoggedOut(studentId, fid);
 
     if (!device) {
       return res.status(404).json({
@@ -60,7 +64,7 @@ export const deactivateDevice = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      message: 'Device deactivated successfully.'
+      message: 'Device marked as logged out.'
     });
   } catch (error) {
     console.error('Error in deactivateDevice:', error);

@@ -2,6 +2,8 @@ import express from 'express';
 import {
   registerStudent,
   loginStudent,
+  verifyStudentEmail,
+  resendStudentOtp,
   getStudentProfile,
   updateStudentProfile
 } from '../controllers/auth/studentAuthController.js';
@@ -17,6 +19,8 @@ const router = express.Router();
 
 // Public routes
 router.post('/auth/register', registerStudent);
+router.post('/auth/verify-otp', verifyStudentEmail);
+router.post('/auth/resend-otp', resendStudentOtp);
 router.post('/auth/login', loginStudent);
 
 // Protected profile routes

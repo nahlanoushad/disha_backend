@@ -1,0 +1,24 @@
+meta {
+  name: Student Verify OTP
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}/student/auth/verify-otp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "nahla@example.com",
+    "otp": "123456",
+    "fcmToken": "your-fcm-token-here",
+    "platform": "web"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000/api
+}

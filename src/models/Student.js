@@ -48,6 +48,11 @@ const StudentSchema = new mongoose.Schema(
     otpExpires: { type: Date, select: false },
     otpAttempts: { type: Number, select: false },
     otpSentAt: { type: Date, select: false },
+    // Notifications newer than this are shown as unread
+    notificationsSeenAt: {
+      type: Date,
+      default: null
+    },
     profileCompleted: {
       type: Boolean,
       default: false

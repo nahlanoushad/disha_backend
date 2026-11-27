@@ -19,7 +19,11 @@ const notificationLogSchema = new mongoose.Schema(
     message: { type: String, required: true, trim: true, maxlength: 500 },
     category: { type: String, enum: NOTIFICATION_CATEGORIES, default: 'General' },
     actionUrl: { type: String, trim: true, default: '' },
-    audience: { type: String, enum: ['all', 'logged_in', 'logged_out'], default: 'all' },
+    audience: { type: String, enum: ['all', 'logged_in', 'logged_out', 'student'], default: 'all' },
+    // Only set when audience is 'student'; nobody else may see that notification
+    recipientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', index: true },
+    // Set when sent through an FCM topic, which reports no per-device results
+    topic: { type: String, default: '' },
     sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     recipientCount: { type: Number, default: 0 }, // students targeted
     deviceCount: { type: Number, default: 0 }, // devices attempted

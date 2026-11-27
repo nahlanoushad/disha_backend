@@ -4,8 +4,13 @@ import Student from '../models/Student.js';
 
 export const AUDIENCES = ['all', 'logged_in', 'logged_out'];
 
+// The "all users" audience is delivered through this FCM topic
+export const ALL_TOPIC = 'all';
+
 // FCM accepts at most 500 messages per sendEach() call
 const BATCH_SIZE = 500;
+// ...and at most 1000 tokens per topic subscription call
+const TOPIC_BATCH_SIZE = 1000;
 
 // Errors that mean the device is permanently gone. Anything else (bad payload,
 // quota, network) must NOT deactivate devices.
@@ -38,14 +43,14 @@ const toWebpushLink = (url) => {
 };
 
 /**
- * Builds the message for one device. The browser's Firebase service worker displays
- * the `notification` block itself when the app is in the background.
+ * The message content, without a target. The browser's Firebase service worker
+ * displays the `notification` block itself when the app is in the background.
  */
-const buildMessage = (device, payload) => {
+const buildContent = (payload) => {
   const clickPath = String(payload.url || '/student/exams');
   const link = toWebpushLink(clickPath);
 
-  const message = {
+  return {
     notification: {
       title: payload.title,
       body: payload.body
@@ -64,18 +69,16 @@ const buildMessage = (device, payload) => {
       eventType: String(payload.eventType || 'exam_reminder')
     }
   };
+};
 
-  // Prefer the registration token; fall back to the installation ID.
-  // (A very long "fid" is a registration token stored by an older registration.)
-  if (device.fcmToken) {
-    message.token = device.fcmToken;
-  } else if (device.fid.length > 50) {
-    message.token = device.fid;
-  } else {
-    message.fid = device.fid;
-  }
+// A very long "fid" is a registration token stored by an older registration
+const registrationToken = (device) =>
+  device.fcmToken || (device.fid.length > 50 ? device.fid : '');
 
-  return message;
+/** Message for one device: by registration token, or installation ID as a fallback. */
+const buildMessage = (device, payload) => {
+  const token = registrationToken(device);
+  return { ...buildContent(payload), ...(token ? { token } : { fid: device.fid }) };
 };
 
 export const fcmService = {
@@ -106,7 +109,76 @@ export const fcmService = {
       await DeviceInstallation.deleteMany({ fcmToken, _id: { $ne: device._id } });
     }
 
+    // Join the "all" topic in the background so registration isn't slowed down.
+    // If it fails, it is retried before the next "all users" send.
+    this.syncAllTopic({ studentId }).catch((error) =>
+      console.warn('[FCM Service] Topic subscription deferred:', error.message)
+    );
+
     return device;
+  },
+
+  /**
+   * Makes the "all" topic match the database: subscribes devices of active students
+   * that aren't in it yet, and removes devices of deactivated students.
+   * Pass { studentId } to limit this to one student.
+   */
+  async syncAllTopic({ studentId } = {}) {
+    const result = { subscribed: 0, unsubscribed: 0, failed: 0 };
+    if (!messaging) return result;
+
+    const scope = studentId ? { studentId } : {};
+    const inactiveIds = new Set(
+      (await Student.distinct('_id', { isActive: false })).map(String)
+    );
+    const devices = await DeviceInstallation.find({ ...scope, isActive: true }).lean();
+
+    const toSubscribe = [];
+    const toUnsubscribe = [];
+    for (const device of devices) {
+      const token = registrationToken(device);
+      if (inactiveIds.has(String(device.studentId))) {
+        if (device.topicToken) toUnsubscribe.push({ device, token: device.topicToken });
+      } else if (token && token !== device.topicToken) {
+        toSubscribe.push({ device, token });
+      }
+    }
+
+    const apply = async (items, method, valueFor, counter) => {
+      for (let i = 0; i < items.length; i += TOPIC_BATCH_SIZE) {
+        const batch = items.slice(i, i + TOPIC_BATCH_SIZE);
+
+        let response;
+        try {
+          response = await messaging[method](batch.map((item) => item.token), ALL_TOPIC);
+        } catch (error) {
+          console.error(`[FCM Service] ${method} failed:`, error.message);
+          result.failed += batch.length;
+          continue;
+        }
+
+        const errorsByIndex = new Map(response.errors.map((e) => [e.index, e.error]));
+        const updates = batch.map((item, index) => {
+          const error = errorsByIndex.get(index);
+          if (!error) {
+            result[counter]++;
+            return { updateOne: { filter: { _id: item.device._id }, update: { topicToken: valueFor(item) } } };
+          }
+          result.failed++;
+          console.warn(`[FCM Service] ${method} error:`, error.message);
+          return UNREGISTERED_CODES.has(error.code)
+            ? { updateOne: { filter: { _id: item.device._id }, update: { isActive: false } } }
+            : null;
+        }).filter(Boolean);
+
+        if (updates.length > 0) await DeviceInstallation.bulkWrite(updates);
+      }
+    };
+
+    await apply(toSubscribe, 'subscribeToTopic', (item) => item.token, 'subscribed');
+    await apply(toUnsubscribe, 'unsubscribeFromTopic', () => '', 'unsubscribed');
+
+    return result;
   },
 
   /**
@@ -223,7 +295,8 @@ export const fcmService = {
   },
 
   /**
-   * Sends an announcement to every device in an audience.
+   * Sends an announcement. "all" goes to the "all" topic (one message, no per-device
+   * results); the other audiences are sent device by device.
    */
   async broadcast(payload, audience = 'all') {
     if (!messaging) {
@@ -234,6 +307,8 @@ export const fcmService = {
       throw error;
     }
 
+    if (audience === 'all') return this.sendToAllTopic(payload);
+
     const activeStudentIds = await Student.distinct('_id', { isActive: true });
     const devices = await DeviceInstallation.find(deviceFilterFor(audience, activeStudentIds)).lean();
     const result = await this.sendToDevices(devices, payload);
@@ -242,6 +317,56 @@ export const fcmService = {
       ...result,
       deviceCount: devices.length,
       recipientCount: new Set(devices.map((device) => String(device.studentId))).size
+    };
+  },
+
+  /**
+   * An admin message to one student. It is personal, so only their logged-in devices get it.
+   */
+  async sendToOneStudent(studentId, payload) {
+    if (!messaging) {
+      const error = new Error(
+        'Push notifications are not configured. Set GOOGLE_APPLICATION_CREDENTIALS to a valid Firebase service-account key and restart the server.'
+      );
+      error.statusCode = 503;
+      throw error;
+    }
+
+    const devices = await DeviceInstallation.find(
+      deviceFilterFor('logged_in', [studentId])
+    ).lean();
+    const result = await this.sendToDevices(devices, payload);
+
+    return { ...result, deviceCount: devices.length, recipientCount: 1 };
+  },
+
+  async sendToAllTopic(payload) {
+    // Catch up any device that hasn't joined the topic yet
+    const sync = await this.syncAllTopic();
+    const errors = [];
+    if (sync.failed > 0) {
+      errors.push(`${sync.failed} device(s) could not be added to or removed from the topic.`);
+    }
+
+    let messageId = '';
+    try {
+      messageId = await messaging.send({ ...buildContent(payload), topic: ALL_TOPIC });
+    } catch (error) {
+      console.error('[FCM Service] Topic send failed:', error.message);
+      errors.unshift(error.message);
+    }
+
+    const stats = await this.getAudienceStats();
+
+    return {
+      topic: ALL_TOPIC,
+      messageId,
+      subscriptionFailures: sync.failed,
+      deviceCount: stats.all.devices,
+      recipientCount: stats.all.students,
+      successCount: 0, // FCM does not report per-device results for topic messages
+      failureCount: 0,
+      errors
     };
   }
 };

@@ -1,4 +1,5 @@
 import Student from '../models/Student.js';
+import { fcmService } from './fcmService.js';
 
 /**
  * Get all students with pagination, search and status filter
@@ -99,6 +100,11 @@ export const updateStudentStatus = async (id, statusData) => {
     error.statusCode = 404;
     throw error;
   }
+
+  // Deactivated students leave the "all users" topic; reactivated ones rejoin
+  fcmService.syncAllTopic({ studentId: student._id }).catch((error) =>
+    console.warn('[Students] Topic update deferred:', error.message)
+  );
 
   return student;
 };

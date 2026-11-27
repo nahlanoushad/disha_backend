@@ -20,6 +20,11 @@ const deviceInstallationSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    // The token currently subscribed to the "all" topic ('' if none)
+    topicToken: {
+      type: String,
+      default: ''
+    },
     platform: {
       type: String,
       default: 'web'

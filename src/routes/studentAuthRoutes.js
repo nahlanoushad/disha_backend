@@ -3,7 +3,9 @@ import {
   registerStudent,
   loginStudent,
   getStudentProfile,
-  updateStudentProfile
+  updateStudentProfile,
+  forgotPassword,
+  resetPassword
 } from '../controllers/auth/studentAuthController.js';
 import {
   getStudentLocation,
@@ -18,6 +20,9 @@ const router = express.Router();
 // Public routes
 router.post('/auth/register', registerStudent);
 router.post('/auth/login', loginStudent);
+router.post('/auth/forgot-password', forgotPassword);
+router.post('/auth/reset-password', resetPassword);
+router.post('/auth/reset-password/:token', resetPassword);
 
 // Protected profile routes
 router.get('/profile', protectStudent, getStudentProfile);

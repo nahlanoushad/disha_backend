@@ -13,10 +13,12 @@ import { protectStudent } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// All student assessment routes require valid student JWT authentication
+// Public route - anyone can fetch assessment questions
+router.get('/questions', getQuestions);
+
+// All subsequent assessment attempt and result routes require valid student JWT authentication
 router.use(protectStudent);
 
-router.get('/questions', getQuestions);
 router.post('/attempts', createAttempt);
 router.get('/attempts', getAttempts);
 router.get('/attempts/latest', getLatestAttempt);

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const StudentSchema = new mongoose.Schema(
   {
@@ -88,6 +89,14 @@ const StudentSchema = new mongoose.Schema(
     interests: {
       type: [String],
       default: []
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false
+    },
+    resetPasswordExpire: {
+      type: Date,
+      select: false
     }
   },
   {
@@ -107,6 +116,23 @@ StudentSchema.pre('save', async function () {
 // Compare candidate password with stored hash
 StudentSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generate and hash reset password token
+StudentSchema.methods.getResetPasswordToken = function () {
+  // Generate random 32-byte hex string
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  // Hash token using sha256 and store in resetPasswordToken field
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  // Set expire time (30 minutes from now)
+  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
+
+  return resetToken;
 };
 
 const Student = mongoose.model('Student', StudentSchema);

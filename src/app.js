@@ -13,6 +13,7 @@ import studentExamRoutes from './routes/studentExamRoutes.js';
 import studentAptitudeRoutes from './routes/studentAptitudeRoutes.js';
 import collegeRoutes from './routes/collegeRoutes.js';
 import adminCareerAssessmentRoutes from './routes/adminCareerAssessmentRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
 const app = express();
 
 // Enable CORS
@@ -55,6 +56,9 @@ app.use('/api/student', studentExamRoutes);
 
 // College routes
 app.use('/api/colleges', collegeRoutes);
+
+// Support request routes
+app.use('/api/support', supportRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

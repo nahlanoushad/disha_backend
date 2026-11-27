@@ -8,7 +8,9 @@ import { GoogleGenAI } from '@google/genai';
 
 export const geminiService = {
   isConfigured() {
-    return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== '');
+    const key = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : '';
+    // Valid Google Gemini API keys start with AIzaSy
+    return Boolean(key && key.startsWith('AIzaSy'));
   },
 
   /**
@@ -18,18 +20,21 @@ export const geminiService = {
   async generateCareerGuidance({
     studentProfile,
     profileSummary,
-    candidateCourses,
-    candidateColleges
+    candidateCourses = [],
+    candidateColleges = []
   }) {
     if (!this.isConfigured()) {
-      console.log('[Gemini Service] Notice: GEMINI_API_KEY not configured. Falling back to rule-based explanation.');
+      console.log('[Gemini Service] Notice: Valid GEMINI_API_KEY (starting with AIzaSy) not configured. Using rule-based explanation.');
       return this._generateCareerFallbackGuidance({ studentProfile, profileSummary, candidateCourses });
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-      const modelsToTry = [preferredModel, 'gemini-2.5-flash', 'gemini-1.5-flash'].filter(
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
+      const rawModel = (process.env.GEMINI_MODEL || '').trim();
+      const preferredModel = (rawModel.startsWith('gemini-') && !rawModel.includes('3.1'))
+        ? rawModel
+        : 'gemini-2.0-flash';
+      const modelsToTry = [preferredModel, 'gemini-1.5-flash'].filter(
         (m, idx, arr) => m && arr.indexOf(m) === idx
       );
 
@@ -76,7 +81,9 @@ STRICT RULES:
       for (const modelToAttempt of modelsToTry) {
         try {
           console.log(`[Gemini Service] Requesting Career Discovery guidance using model: ${modelToAttempt}...`);
-          const response = await ai.models.generateContent({
+          
+          // 6-second timeout race to prevent hanging
+          const apiCall = ai.models.generateContent({
             model: modelToAttempt,
             contents: [
               { role: 'user', parts: [{ text: `${systemPrompt}\n\nStudent Career Assessment Data:\n${JSON.stringify(anonymizedPayload, null, 2)}` }] }
@@ -86,6 +93,11 @@ STRICT RULES:
             }
           });
 
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout: Model ${modelToAttempt} did not respond within 6s`)), 6000)
+          );
+
+          const response = await Promise.race([apiCall, timeoutPromise]);
           const responseText = typeof response.text === 'function' ? response.text() : response.text;
           if (responseText) {
             parsed = JSON.parse(responseText);
@@ -102,7 +114,7 @@ STRICT RULES:
         throw lastErr || new Error('Empty response received from Gemini API');
       }
 
-      const validCourseIds = new Set(candidateCourses.map((c) => (c.courseId?.toString() || c._id?.toString())));
+      const validCourseIds = new Set((candidateCourses || []).map((c) => (c.courseId?.toString() || c._id?.toString())));
       const safeCourseIds = Array.isArray(parsed.recommendedCourseIds)
         ? parsed.recommendedCourseIds.filter((id) => validCourseIds.has(String(id)))
         : [];
@@ -131,10 +143,11 @@ STRICT RULES:
   /**
    * Safe, deterministic rule-based guidance fallback when Gemini is unavailable
    */
-  _generateCareerFallbackGuidance({ studentProfile, profileSummary, candidateCourses, errorMessage }) {
-    const topCourse = candidateCourses[0];
+  _generateCareerFallbackGuidance({ studentProfile, profileSummary, candidateCourses = [], errorMessage }) {
+    const topCourse = (candidateCourses && candidateCourses.length > 0) ? candidateCourses[0] : null;
     const stream = studentProfile?.stream || 'Higher Secondary';
     const topSubjects = (profileSummary?.enjoyedSubjects || []).join(', ') || 'your core subjects';
+    const safeCourseIds = (candidateCourses || []).slice(0, 3).map((c) => (c.courseId?.toString() || c._id?.toString())).filter(Boolean);
 
     return {
       status: errorMessage ? 'failed' : 'unavailable',
@@ -146,6 +159,7 @@ STRICT RULES:
         : 'The recommended programs offer structured degree paths aligned with your selected Plus Two interests.',
       learningGuidance: 'Explore foundational introductory courses, review core syllabus topics for your chosen degree, and research university admission deadlines.',
       growthAreas: 'Build confidence by participating in group discussions, working on small self-directed projects, and connecting with seniors in your target field.',
+      validatedCourseIds: safeCourseIds,
       generatedAt: new Date()
     };
   },

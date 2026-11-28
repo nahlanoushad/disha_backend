@@ -48,6 +48,15 @@ const StudentSchema = new mongoose.Schema(
     otpExpires: { type: Date, select: false },
     otpAttempts: { type: Number, select: false },
     otpSentAt: { type: Date, select: false },
+    // Forgot-password code (separate from the sign-up code above)
+    passwordResetHash: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
+    passwordResetAttempts: { type: Number, select: false },
+    passwordResetSentAt: { type: Date, select: false },
+    passwordResetWindowStart: { type: Date, select: false },
+    passwordResetCount: { type: Number, select: false },
+    // Login tokens issued before this moment are rejected
+    passwordChangedAt: { type: Date },
     // Notifications newer than this are shown as unread
     notificationsSeenAt: {
       type: Date,

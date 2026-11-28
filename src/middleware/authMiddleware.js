@@ -100,6 +100,18 @@ export const protectStudent = async (req, res, next) => {
       });
     }
 
+    // A password reset signs out every session that started before it
+    // (token times are in whole seconds)
+    if (
+      student.passwordChangedAt &&
+      decoded.iat < Math.floor(student.passwordChangedAt.getTime() / 1000)
+    ) {
+      return res.status(401).json({
+        status: 'fail',
+        message: 'Your password was changed. Please sign in again.'
+      });
+    }
+
     req.student = student;
     next();
   } catch (error) {

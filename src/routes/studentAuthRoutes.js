@@ -4,6 +4,8 @@ import {
   loginStudent,
   verifyStudentEmail,
   resendStudentOtp,
+  forgotPassword,
+  resetPassword,
   getStudentProfile,
   updateStudentProfile
 } from '../controllers/auth/studentAuthController.js';
@@ -22,6 +24,8 @@ router.post('/auth/register', registerStudent);
 router.post('/auth/verify-otp', verifyStudentEmail);
 router.post('/auth/resend-otp', resendStudentOtp);
 router.post('/auth/login', loginStudent);
+router.post('/auth/forgot-password', forgotPassword);
+router.post('/auth/reset-password', resetPassword);
 
 // Protected profile routes
 router.get('/profile', protectStudent, getStudentProfile);

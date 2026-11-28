@@ -1,6 +1,8 @@
 import Student from '../../models/Student.js';
 import generateToken from '../../utils/generateToken.js';
 import AppError from '../../utils/appError.js';
+import { isEmailConfigured } from '../../utils/sendEmail.js';
+import { requestPasswordReset, resetPasswordWithCode } from '../../services/passwordResetService.js';
 import { fcmService } from '../../services/fcmService.js';
 import {
   sendVerificationOtp,
@@ -303,6 +305,69 @@ export const loginStudent = async (req, res, next) => {
       data: {
         student: formatStudentResponse(student)
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Email a password reset code
+ * @route   POST /api/student/auth/forgot-password
+ * @access  Public
+ */
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const email = text(req.body.email).toLowerCase();
+    if (!email) return next(new AppError('Email is required', 400));
+
+    // Checked first so the answer is the same for every address
+    if (!isEmailConfigured()) {
+      return next(new AppError('Password reset is unavailable: email is not configured.', 503));
+    }
+
+    await requestPasswordReset(email);
+
+    // Never say whether the address is registered, and never return the code
+    res.status(200).json({
+      status: 'success',
+      message: 'If an account exists for this email, a reset code has been sent.',
+      retryAfter: OTP_RESEND_SECONDS,
+      expiresInMinutes: OTP_TTL_MINUTES
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Set a new password using the emailed code
+ * @route   POST /api/student/auth/reset-password
+ * @access  Public
+ */
+export const resetPassword = async (req, res, next) => {
+  try {
+    const email = text(req.body.email).toLowerCase();
+    const otp = text(req.body.otp);
+    // Passwords are not trimmed: registration and login use them as typed
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!email || !/^\d{6}$/.test(otp)) {
+      return next(new AppError('Email and the 6-digit code are required', 400));
+    }
+    if (password.length < 6) {
+      return next(new AppError('Password must be at least 6 characters', 400));
+    }
+    // The hashing algorithm ignores anything past 72 bytes
+    if (Buffer.byteLength(password) > 72) {
+      return next(new AppError('Password is too long (72 characters maximum)', 400));
+    }
+
+    await resetPasswordWithCode(email, otp, password);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Password updated. Sign in with your new password.'
     });
   } catch (error) {
     next(error);
